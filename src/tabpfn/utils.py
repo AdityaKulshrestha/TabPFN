@@ -113,17 +113,19 @@ def infer_devices(devices: DevicesSpecification) -> tuple[torch.device, ...]:
     If `device` is "auto" then the devices are selected as follows:
     1. If CUDA is available and not excluded, returns all available "cuda" devices
     2. Otherwise, if MPS is available and not excluded, returns the "mps" device
-    3. Otherwise, returns the "cpu" device
+    3. Otherwise, if XPU is available and not excluded, returns the "xpu" device
+    4. Otherwise, returns the "cpu" device
 
     CUDA and MPS can be excluded from the "auto" selection by specifying the
-    TABPFN_EXCLUDE_DEVICES environment variable. This can be either "cuda", "mps", or
-    "cuda,mps". This is useful for excluding device classes in CI.
+    TABPFN_EXCLUDE_DEVICES environment variable. This can be either "cuda", "mps", "xpu"
+    , or "cuda,mps,xpu". This is useful for excluding device classes in CI.
 
     Args:
         devices: The device specification. One of:
             - "auto": the device will be selected as described above
-            - a PyTorch device string like "cuda", "mps", or "cpu": this single device
-                will be selected by parsing the string to a torch.device
+            - a PyTorch device string like "cuda", "mps", "xpu" or "cpu":
+                this single device will be selected by parsing the string
+                to a torch.device
             - a torch.device: this single device will be selected
             - a list of PyTorch device strings or torch.device: each item will be
                 converted to a torch.device, and all of the devices selected
@@ -138,23 +140,7 @@ def infer_devices(devices: DevicesSpecification) -> tuple[torch.device, ...]:
     }
 
     if devices == "auto":
-        if "cuda" not in exclude_devices and torch.cuda.is_available():
-            return tuple(
-                torch.device(f"cuda:{i}") for i in range(torch.cuda.device_count())
-            )
-
-        if "mps" not in exclude_devices and torch.backends.mps.is_available():
-            if _is_torch_mps_supported():
-                return (torch.device("mps"),)
-            warnings.warn(
-                "An MPS device is available, but TabPFN disables MPS for "
-                "PyTorch < 2.6 (earlier versions can give poor accuracy and "
-                "lack bfloat16 autocast support on the MPS backend). Falling "
-                "back to CPU. Install torch>=2.6 to use MPS.",
-                stacklevel=2,
-            )
-
-        return (torch.device("cpu"),)
+        return _infer_auto_devices(exclude_devices)
 
     if isinstance(devices, (str, torch.device)):
         devices = (devices,)
@@ -182,6 +168,30 @@ def infer_devices(devices: DevicesSpecification) -> tuple[torch.device, ...]:
     return devices
 
 
+def _infer_auto_devices(exclude_devices: set[str]) -> tuple[torch.device, ...]:
+    """The "auto" device-selection policy: cuda > mps > xpu > cpu."""
+    if "cuda" not in exclude_devices and torch.cuda.is_available():
+        return tuple(
+            torch.device(f"cuda:{i}") for i in range(torch.cuda.device_count())
+        )
+
+    if "mps" not in exclude_devices and torch.backends.mps.is_available():
+        if _is_torch_mps_supported():
+            return (torch.device("mps"),)
+        warnings.warn(
+            "An MPS device is available, but TabPFN disables MPS for "
+            "PyTorch < 2.6 (earlier versions can give poor accuracy and "
+            "lack bfloat16 autocast support on the MPS backend). Falling "
+            "back to CPU. Install torch>=2.6 to use MPS.",
+            stacklevel=2,
+        )
+
+    if "xpu" not in exclude_devices and torch.xpu.is_available():
+        return tuple(torch.device(f"xpu:{i}") for i in range(torch.xpu.device_count()))
+
+    return (torch.device("cpu"),)
+
+
 def _parse_device(device: str | torch.device) -> torch.device:
     # This is safe because torch.device(torch.device(...)) is a noop.
     # torch.device(device) returns a fairly informative error message if `device` is not
@@ -192,6 +202,9 @@ def _parse_device(device: str | torch.device) -> torch.device:
     # index. 0 is implicit if no index is specified, so add it.
     if device == torch.device("cuda"):
         device = torch.device("cuda:0")
+
+    if device == torch.device("xpu"):
+        device = torch.device("xpu:0")
 
     return device
 

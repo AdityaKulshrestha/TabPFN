@@ -8,7 +8,12 @@ import numpy as np
 import pytest
 import torch
 
-from tabpfn.errors import TabPFNCUDAOutOfMemoryError, handle_oom_errors
+from tabpfn.errors import (
+    TabPFNCUDAOutOfMemoryError,
+    TabPFNMPSOutOfMemoryError,
+    TabPFNXPUOutOfMemoryError,
+    handle_oom_errors,
+)
 
 
 class TestHandleOomErrors:
@@ -48,3 +53,50 @@ class TestHandleOomErrors:
             handle_oom_errors(self.devices, np.zeros((2, 2)), model_type="classifier"),
         ):
             raise RuntimeError("something else")
+
+
+class TestHandleOomErrorsDeviceDispatch:
+    """`torch.OutOfMemoryError` is dispatched by `devices[0].type`.
+
+    XPU's allocator raises the same typed `torch.OutOfMemoryError` CUDA does
+    (confirmed against the xpu caching allocator), so it must be routed to
+    `TabPFNXPUOutOfMemoryError`, not silently fall back to the CUDA one.
+    """
+
+    def test__xpu_device__typed_oom__raises_xpu_error(self) -> None:
+        with (
+            pytest.raises(TabPFNXPUOutOfMemoryError),
+            handle_oom_errors(
+                (torch.device("xpu:0"),), np.zeros((2, 2)), model_type="classifier"
+            ),
+        ):
+            raise torch.OutOfMemoryError
+
+    def test__cuda_device__typed_oom__raises_cuda_error(self) -> None:
+        with (
+            pytest.raises(TabPFNCUDAOutOfMemoryError),
+            handle_oom_errors(
+                (torch.device("cuda:0"),), np.zeros((2, 2)), model_type="classifier"
+            ),
+        ):
+            raise torch.OutOfMemoryError
+
+    def test__unmapped_device__typed_oom__falls_back_to_cuda_error(self) -> None:
+        """Unknown/unmapped device types keep the historical CUDA default."""
+        with (
+            pytest.raises(TabPFNCUDAOutOfMemoryError),
+            handle_oom_errors(
+                (torch.device("cpu"),), np.zeros((2, 2)), model_type="classifier"
+            ),
+        ):
+            raise torch.OutOfMemoryError
+
+    def test__mps_device__generic_runtime_error__raises_mps_error(self) -> None:
+        """MPS raises a plain RuntimeError (no typed OutOfMemoryError), unlike xpu."""
+        with (
+            pytest.raises(TabPFNMPSOutOfMemoryError),
+            handle_oom_errors(
+                (torch.device("mps"),), np.zeros((2, 2)), model_type="classifier"
+            ),
+        ):
+            raise RuntimeError("MPS backend out of memory")

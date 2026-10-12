@@ -164,6 +164,8 @@ def regressor_instance(request: pytest.FixtureRequest) -> TabPFNRegressor:
     device = request.param
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
     return TabPFNRegressor(
         n_estimators=2,
         device=device,
@@ -207,6 +209,8 @@ def test__finetuned_tabpfn_regressor__fit_and_predict(
     """Test FinetunedTabPFNRegressor fit/predict with a mocked forward pass."""
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     X, y = synthetic_regression_data
     X_train, X_test, y_train, _y_test = train_test_split(
@@ -264,6 +268,8 @@ def test__regressor_checkpoint_contains_mse_metric(
     """
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     X, y = synthetic_regression_data
     X_train, _X_test, y_train, _y_test = train_test_split(

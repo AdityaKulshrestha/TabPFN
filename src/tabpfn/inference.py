@@ -75,6 +75,8 @@ class _TimedIterator(Iterator[_T]):
                 torch.cuda.synchronize(self._device)
             elif self._device.type == "mps" and hasattr(torch, "mps"):
                 torch.mps.synchronize()
+            elif self._device.type == "xpu":
+                torch.xpu.synchronize(self._device)
         self.elapsed_seconds += time.perf_counter() - start
         return value
 

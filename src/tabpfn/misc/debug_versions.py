@@ -52,6 +52,9 @@ SystemEnv = namedtuple(
         "hip_compiled_version",
         "hip_runtime_version",
         "miopen_runtime_version",
+        "xpu_compiled_version",
+        "is_xpu_available",
+        "xpu_gpu_models",
         "caching_allocator_config",
         "is_xnnpack_available",
         "cpu_info",
@@ -209,6 +212,27 @@ def _get_gpu_info(run_lambda):
         return None
     # Anonymize GPUs by removing their UUID
     return re.sub(uuid_regex, "", out)
+
+
+def _get_xpu_gpu_info():
+    """Return the names of Intel XPU devices actually detected by torch.
+
+    Unlike `torch.version.xpu` (the oneAPI/DPC++ compiler version torch was
+    *built* against), this reports whether hardware is actually visible at
+    runtime -- useful for telling apart "no XPU driver/hardware" from a
+    torch/oneAPI version mismatch once hardware is detected.
+    """
+    if not (TORCH_AVAILABLE and hasattr(torch, "xpu")):
+        return None
+    try:
+        if not torch.xpu.is_available():
+            return None
+        count = torch.xpu.device_count()
+        if count == 0:
+            return None
+        return "\n".join(f"{i}: {torch.xpu.get_device_name(i)}" for i in range(count))
+    except Exception as e:  # noqa: BLE001 - diagnostics must never crash on this
+        return f"Could not query XPU devices: {e}"
 
 
 def _get_running_cuda_version(run_lambda):
@@ -430,8 +454,10 @@ def _get_env_info():
     availability, CUDA runtime version, and CUDA module loading configuration.
     Further, it details the GPU model and configuration, Nvidia driver version,
     cuDNN version, pip version, and versions of relevant pip and conda packages.
-    Additionally, HIP runtime version, MIOpen runtime version, caching allocator
-    config, XNNPACK availability, and CPU information are provided.
+    Additionally, HIP runtime version, MIOpen runtime version, XPU availability,
+    the oneAPI/DPC++ compiler version torch was built against, detected Intel
+    XPU hardware, caching allocator config, XNNPACK availability, and CPU
+    information are provided.
 
     Returns:
         SystemEnv (namedtuple): A tuple containing various environment details
@@ -458,9 +484,20 @@ def _get_env_info():
             miopen_runtime_version = get_version_or_na(cfg, "MIOpen")
             cuda_version_str = "N/A"
             hip_compiled_version = torch.version.hip
+
+        if hasattr(torch, "xpu"):
+            # torch.version.xpu is the oneAPI/DPC++ compiler version torch was
+            # *built* against -- compare it against the oneAPI toolkit actually
+            # installed (e.g. `sycl-ls`, `icpx --version`) to spot mismatches.
+            xpu_available_str = str(torch.xpu.is_available())
+            xpu_compiled_version = getattr(torch.version, "xpu", None) or "N/A"
+        else:
+            xpu_available_str = "False"
+            xpu_compiled_version = "N/A"
     else:
         version_str = cuda_available_str = cuda_version_str = "N/A"
         hip_compiled_version = hip_runtime_version = miopen_runtime_version = "N/A"
+        xpu_available_str = xpu_compiled_version = "N/A"
 
     sys_version = sys.version.replace("\n", " ")
     conda_packages = _get_conda_packages(run_lambda)
@@ -478,6 +515,9 @@ def _get_env_info():
         hip_compiled_version=hip_compiled_version,
         hip_runtime_version=hip_runtime_version,
         miopen_runtime_version=miopen_runtime_version,
+        xpu_compiled_version=xpu_compiled_version,
+        is_xpu_available=xpu_available_str,
+        xpu_gpu_models=_get_xpu_gpu_info(),
         pip_version=pip_version,
         pip_packages=pip_list_output,
         conda_packages=conda_packages,
@@ -496,6 +536,7 @@ env_info_fmt = """
 PyTorch version: {torch_version}
 CUDA used to build PyTorch: {cuda_compiled_version}
 ROCM used to build PyTorch: {hip_compiled_version}
+XPU (oneAPI/DPC++) used to build PyTorch: {xpu_compiled_version}
 
 OS: {os}
 GCC version: {gcc_version}
@@ -513,6 +554,8 @@ Nvidia driver version: {nvidia_driver_version}
 cuDNN version: {cudnn_version}
 HIP runtime version: {hip_runtime_version}
 MIOpen runtime version: {miopen_runtime_version}
+Is XPU available: {is_xpu_available}
+XPU GPU models and configuration (hardware actually detected): {xpu_gpu_models}
 Is XNNPACK available: {is_xnnpack_available}
 
 CPU:
@@ -561,6 +604,12 @@ def _pretty_str(envinfo):
     # If nvidia_gpu_models is multiline, start on the next line
     mutable_dict["nvidia_gpu_models"] = _maybe_start_on_next_line(
         envinfo.nvidia_gpu_models,
+    )
+
+    # If xpu_gpu_models is multiline (more than one Intel XPU device), start
+    # on the next line, same as nvidia_gpu_models above.
+    mutable_dict["xpu_gpu_models"] = _maybe_start_on_next_line(
+        envinfo.xpu_gpu_models,
     )
 
     # If the machine doesn't have CUDA, report some fields as 'No CUDA'

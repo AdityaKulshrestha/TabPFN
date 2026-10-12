@@ -25,6 +25,8 @@ def get_pytest_devices() -> list[str]:
         devices.append("cuda")
     if torch.backends.mps.is_available() and "mps" not in exclude_devices:
         devices.append("mps")
+    if torch.xpu.is_available() and "xpu" not in exclude_devices:
+        devices.append("xpu")
 
     if len(devices) == 0:
         raise RuntimeError("No devices available for testing.")

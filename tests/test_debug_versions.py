@@ -34,3 +34,9 @@ def test_display_debug_info():
 
     # Make sure it doesn't crash and produces reasonable output
     assert len(output) > 100  # Should have substantial output
+
+    # XPU diagnostics should always be present, regardless of whether real
+    # Intel XPU hardware/drivers are available on the machine running the test.
+    assert "XPU (oneAPI/DPC++) used to build PyTorch:" in output
+    assert "Is XPU available:" in output
+    assert "XPU GPU models and configuration" in output

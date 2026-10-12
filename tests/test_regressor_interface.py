@@ -1338,6 +1338,8 @@ def test__predict_batched__matches_per_dataset(device: str) -> None:
     """predict_batched matches per-dataset fit+predict, in input order."""
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     data = [_mk_reg_dataset(s) for s in range(3)]
     X_list = [d[0] for d in data]
@@ -1460,6 +1462,8 @@ def test__predict_batched__matches_per_dataset_dataframe(device: str) -> None:
     """
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     pd = pytest.importorskip("pandas")
 

@@ -33,14 +33,24 @@ TabPFN supports Python 3.10+.
 
 **On macOS:** GPU support is automatically included for Apple Silicon Macs. For best performance, ensure you are using PyTorch 2.13 or newer (see [#949](https://github.com/PriorLabs/TabPFN/pull/949)).
 
-**On Linux:** Nvidia GPU support is automatically included. For AMD GPUs, first [install PyTorch with ROCm](https://pytorch.org/get-started/locally/), then install TabPFN. For example,
-```bash
-pip install torch --index-url https://download.pytorch.org/whl/rocm7.2
-pip install tabpfn
-```
-For a CPU-only install, first [install CPU-only PyTorch](https://pytorch.org/get-started/locally/), then install TabPFN. This saves disk space if you do not have a GPU.
+**On Linux:** 
+  - Nvidia GPU: support is automatically included.
+  - Intel GPUs: [install PyTorch with XPU](http://docs.pytorch.org/docs/2.14/notes/get_start_xpu.html#installation), then install TabPFN. For example,
+    ```
+    pip install torch --index-url https://download.pytorch.org/whl/xpu
+    pip install tabpfn
+    ```
+  - AMD GPUs: [install PyTorch with ROCm](https://pytorch.org/get-started/locally/), then install TabPFN. For example,
+    ```bash
+    pip install torch --index-url https://download.pytorch.org/whl/rocm7.2
+    pip install tabpfn
+    ```
+  - CPU: [install CPU-only PyTorch](https://pytorch.org/get-started/locally/), then install TabPFN. This saves disk space if you do not have a GPU.
 
-**On Windows:** For Nvidia GPUs, [install PyTorch with CUDA](https://pytorch.org/get-started/locally/), then install TabPFN. For AMD GPUs, [install PyTorch with ROCm](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/docs/install/installrad/windows/install-pytorch.html), then install TabPFN.
+**On Windows:** 
+  - Nvidia GPUs: [install PyTorch with CUDA](https://pytorch.org/get-started/locally/), then install TabPFN. 
+  - Intel GPUs: [install PyTorch with XPU](https://docs.pytorch.org/docs/2.14/notes/get_start_xpu.html#installation), then install TabPFN.
+  - AMD GPUs: [install PyTorch with ROCm](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/docs/install/installrad/windows/install-pytorch.html), then install TabPFN.
 
 
 ### Basic Usage

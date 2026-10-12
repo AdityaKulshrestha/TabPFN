@@ -1504,6 +1504,8 @@ def test__predict_proba_batched__matches_per_dataset(device: str) -> None:
     """
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     def mkds(seed: int, n: int = 60, f: int = 5) -> tuple[np.ndarray, np.ndarray]:
         r = np.random.RandomState(seed)
@@ -1615,6 +1617,8 @@ def test__predict_proba_batched__matches_per_dataset_dataframe(device: str) -> N
     """
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     def mkdf(seed: int, n: int = 60) -> tuple[pd.DataFrame, np.ndarray]:
         r = np.random.RandomState(seed)

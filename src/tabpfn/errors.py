@@ -146,6 +146,22 @@ class TabPFNMPSOutOfMemoryError(TabPFNOutOfMemoryError):
     device_name = "MPS"
 
 
+class TabPFNXPUOutOfMemoryError(TabPFNOutOfMemoryError):
+    """Error raised when XPU (Intel GPU) runs out of memory during prediction."""
+
+    device_name = "XPU"
+
+
+# Devices whose allocator raises the typed `torch.OutOfMemoryError` (unlike MPS,
+# which raises a plain `RuntimeError` -- see the `except RuntimeError` branch
+# below). Looked up by `devices[0].type`; defaults to CUDA for any device that
+# raises the typed exception but isn't mapped here, preserving prior behavior.
+_TYPED_OOM_ERRORS: dict[str, type[TabPFNOutOfMemoryError]] = {
+    "cuda": TabPFNCUDAOutOfMemoryError,
+    "xpu": TabPFNXPUOutOfMemoryError,
+}
+
+
 def is_oom_error(e: Exception) -> bool:
     """Return True if *e* is a GPU out-of-memory error (CUDA or MPS)."""
     return isinstance(e, torch.OutOfMemoryError) or (
@@ -184,12 +200,15 @@ def handle_oom_errors(
     Raises:
         TabPFNCUDAOutOfMemoryError: If a CUDA OOM error occurs.
         TabPFNMPSOutOfMemoryError: If an MPS OOM error occurs.
+        TabPFNXPUOutOfMemoryError: If an XPU OOM error occurs.
     """
     try:
         yield
     except torch.OutOfMemoryError as e:
+        device_type = devices[0].type if devices else "cuda"
+        error_cls = _TYPED_OOM_ERRORS.get(device_type, TabPFNCUDAOutOfMemoryError)
         n_test_samples, n_features = _sizes_for_message(X)
-        raise TabPFNCUDAOutOfMemoryError(
+        raise error_cls(
             e,
             n_train_samples=n_train_samples,
             n_test_samples=n_test_samples,

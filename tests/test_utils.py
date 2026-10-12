@@ -51,6 +51,7 @@ def test__infer_devices__auto__cuda_and_mps_not_available__selects_cpu(
     monkeypatch.setenv("TABPFN_EXCLUDE_DEVICES", "")
     mocker.patch("torch.cuda").is_available.return_value = False
     mocker.patch("torch.backends.mps").is_available.return_value = False
+    mocker.patch("torch.xpu").is_available.return_value = False
     assert infer_devices(devices="auto") == (torch.device("cpu"),)
 
 
@@ -62,6 +63,7 @@ def test__infer_devices__auto__single_cuda_gpu_available__selects_it(
     mock_cuda.is_available.return_value = True
     mock_cuda.device_count.return_value = 1
     mocker.patch("torch.backends.mps").is_available.return_value = True
+    mocker.patch("torch.xpu").is_available.return_value = True
     assert infer_devices(devices="auto") == (torch.device("cuda:0"),)
 
 
@@ -73,6 +75,7 @@ def test__infer_devices__auto__multiple_cuda_gpus_available__selects_all(
     mock_cuda.is_available.return_value = True
     mock_cuda.device_count.return_value = 3
     mocker.patch("torch.backends.mps").is_available.return_value = True
+    mocker.patch("torch.xpu").is_available.return_value = True
 
     assert infer_devices(devices="auto") == (
         torch.device("cuda:0"),
@@ -89,6 +92,7 @@ def test__infer_devices__auto__cuda_and_mps_available_but_excluded__selects_cpu(
     mock_cuda.is_available.return_value = True
     mock_cuda.device_count.return_value = 1
     mocker.patch("torch.backends.mps").is_available.return_value = True
+    mocker.patch("torch.xpu").is_available.return_value = False
     assert infer_devices(devices="auto") == (torch.device("cpu"),)
 
 
@@ -98,6 +102,62 @@ def test__infer_devices__auto__mps_available_but_torch_too_old__selects_cpu(
     monkeypatch.setattr(torch, "__version__", TorchVersion("2.4.0"))
     mocker.patch("torch.cuda").is_available.return_value = False
     mocker.patch("torch.backends.mps").is_available.return_value = True
+    mocker.patch("torch.xpu").is_available.return_value = False
+    assert infer_devices(devices="auto") == (torch.device("cpu"),)
+
+
+def test__infer_devices__auto__cuda_and_mps_not_available__xpu_available__selects_it(
+    mocker: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TABPFN_EXCLUDE_DEVICES", "")
+    mocker.patch("torch.cuda").is_available.return_value = False
+    mocker.patch("torch.backends.mps").is_available.return_value = False
+    mock_xpu = mocker.patch("torch.xpu")
+    mock_xpu.is_available.return_value = True
+    mock_xpu.device_count.return_value = 1
+    assert infer_devices(devices="auto") == (torch.device("xpu:0"),)
+
+
+def test__infer_devices__auto__multiple_xpu_devices_available__selects_all(
+    mocker: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TABPFN_EXCLUDE_DEVICES", "")
+    mocker.patch("torch.cuda").is_available.return_value = False
+    mocker.patch("torch.backends.mps").is_available.return_value = False
+    mock_xpu = mocker.patch("torch.xpu")
+    mock_xpu.is_available.return_value = True
+    mock_xpu.device_count.return_value = 2
+
+    assert infer_devices(devices="auto") == (
+        torch.device("xpu:0"),
+        torch.device("xpu:1"),
+    )
+
+
+def test__infer_devices__auto__cuda_available__prefers_cuda_over_xpu(
+    mocker: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TABPFN_EXCLUDE_DEVICES", "")
+    mock_cuda = mocker.patch("torch.cuda")
+    mock_cuda.is_available.return_value = True
+    mock_cuda.device_count.return_value = 1
+    mocker.patch("torch.backends.mps").is_available.return_value = False
+    mock_xpu = mocker.patch("torch.xpu")
+    mock_xpu.is_available.return_value = True
+    mock_xpu.device_count.return_value = 1
+
+    assert infer_devices(devices="auto") == (torch.device("cuda:0"),)
+
+
+def test__infer_devices__auto__xpu_available_but_excluded__selects_cpu(
+    mocker: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TABPFN_EXCLUDE_DEVICES", "xpu")
+    mocker.patch("torch.cuda").is_available.return_value = False
+    mocker.patch("torch.backends.mps").is_available.return_value = False
+    mock_xpu = mocker.patch("torch.xpu")
+    mock_xpu.is_available.return_value = True
+    mock_xpu.device_count.return_value = 1
     assert infer_devices(devices="auto") == (torch.device("cpu"),)
 
 
@@ -112,6 +172,14 @@ def test__infer_devices__device_specified__selects_it(
     assert infer_devices(devices="cuda:0") == (torch.device("cuda:0"),)
 
 
+def test__infer_devices__xpu_device_specified__selects_it() -> None:
+    assert infer_devices(devices="xpu:0") == (torch.device("xpu:0"),)
+
+
+def test__infer_devices__bare_xpu_specified__normalizes_to_xpu_0() -> None:
+    assert infer_devices(devices="xpu") == (torch.device("xpu:0"),)
+
+
 def test__infer_devices__multiple_devices_specified___selects_them(
     mocker: MagicMock,
 ) -> None:
@@ -122,6 +190,12 @@ def test__infer_devices__multiple_devices_specified___selects_them(
 
     inferred = set(infer_devices(devices=["cuda:0", "cuda:1", "cuda:4"]))
     expected = {torch.device("cuda:0"), torch.device("cuda:1"), torch.device("cuda:4")}
+    assert inferred == expected
+
+
+def test__infer_devices__multiple_xpu_devices_specified__selects_them() -> None:
+    inferred = set(infer_devices(devices=["xpu:0", "xpu:1"]))
+    expected = {torch.device("xpu:0"), torch.device("xpu:1")}
     assert inferred == expected
 
 

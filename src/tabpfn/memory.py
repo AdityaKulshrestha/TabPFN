@@ -43,6 +43,11 @@ def should_save_peak_mem(
             X_train_shape, X_test_shape, devices, dtype_byte_size
         )
 
+    if all(device.type == "xpu" for device in devices):
+        return _should_save_peak_mem_xpu(
+            X_train_shape, X_test_shape, devices, dtype_byte_size
+        )
+
     # For an unrecognised device, enable memory saving to be safe.
     return True
 
@@ -86,6 +91,41 @@ def _get_free_cuda_memory_bytes(device: torch.device) -> float:
     pytorch_cache_free_memory = torch.cuda.memory_reserved(
         device
     ) - torch.cuda.memory_allocated(device)
+    return system_free_memory + pytorch_cache_free_memory
+
+
+def _should_save_peak_mem_xpu(
+    X_train_shape: tuple[int, int],
+    X_test_shape: tuple[int, int],
+    devices: Sequence[torch.device],
+    dtype_byte_size: int,
+) -> bool:
+    free_memory_bytes = min(_get_free_xpu_memory_bytes(device) for device in devices)
+
+    # Our baseline is 2 byte floats on an .
+    # We observe that the threshold shifts roughly linearly with GPU memory size, so we
+    # make that adjustment.
+    baseline_cell_threshold = 6_000_000
+    baseline_dtype_byte_size = 2
+    baseline_gpu_memory_bytes = 32e9
+    cell_threshold = baseline_cell_threshold * (
+        baseline_dtype_byte_size / dtype_byte_size
+    )
+    cell_threshold = cell_threshold * (free_memory_bytes / baseline_gpu_memory_bytes)
+
+    # If we have multiple GPUs, we reduce the threshold a bit, based on empirical
+    # results.
+    if len(devices) > 1:
+        cell_threshold *= 0.8
+
+    return _get_num_cells(X_train_shape, X_test_shape) > cell_threshold
+
+
+def _get_free_xpu_memory_bytes(device: torch.device) -> float:
+    system_free_memory, _ = torch.xpu.mem_get_info(device)
+    pytorch_cache_free_memory = torch.xpu.memory_reserved(
+        device
+    ) - torch.xpu.memory_allocated(device)
     return system_free_memory + pytorch_cache_free_memory
 
 

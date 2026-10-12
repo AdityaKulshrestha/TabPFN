@@ -143,6 +143,22 @@ def _execute_function_in_thread(
                     return output
 
                 return sync_stream_and_get_output
+        if device.type == "xpu":
+            with torch.xpu.device(device):
+                output = function(device=device)
+
+                # The output will be consumed on a different xpu stream, which needs to
+                # wait for the computation on this stream to be complete. Thus we insert
+                # "ready" event after the model evaluation, and return a function to the
+                # consumer that waits on this event.
+                output_ready_event = torch.xpu.Event()
+                output_ready_event.record()
+
+                def sync_stream_and_get_output() -> R_co:
+                    output_ready_event.synchronize()
+                    return output
+
+                return sync_stream_and_get_output
 
         # Theoretically it is possible to parallelise over classes of device other than
         # GPUs, but mainly this is useful for unit testing with multiple CPU devices.

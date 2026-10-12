@@ -466,6 +466,8 @@ def classifier_instance(request: pytest.FixtureRequest) -> TabPFNClassifier:
     device = request.param
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
     return TabPFNClassifier(
         n_estimators=2,
         device=device,
@@ -514,6 +516,8 @@ def create_classifier(
         pytest.skip("Unsupported combination: CPU with 'autocast'")
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     default_kwargs: dict[str, Any] = {"random_state": 42}
     default_kwargs.update(kwargs)
@@ -564,6 +568,8 @@ def test__finetuned_tabpfn_classifier__fit_and_predict(
     """
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     X, y = synthetic_data
     n_classes = len(np.unique(y))
@@ -1008,6 +1014,8 @@ def test__finetuned_tabpfn_classifier__checkpoint_saving_and_loading(
     """Test that checkpoints are saved and can be loaded correctly."""
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     X, y = synthetic_data
     n_classes = len(np.unique(y))
@@ -1095,6 +1103,8 @@ def test__finetuned_tabpfn_classifier__checkpoint_resumption(
     """Test that training can be resumed from a checkpoint."""
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     X, y = synthetic_data
     n_classes = len(np.unique(y))
@@ -1249,6 +1259,8 @@ def test__finetuned_tabpfn_classifier__checkpoint_interval_configuration(
     """Test that checkpoint_interval parameter works correctly."""
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     X, y = synthetic_data
     n_classes = len(np.unique(y))
@@ -1316,6 +1328,8 @@ def test__finetuned_tabpfn_classifier__best_checkpoint_saving(
     """Test that best checkpoint is saved correctly."""
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     X, y = synthetic_data
     n_classes = len(np.unique(y))
@@ -1906,6 +1920,8 @@ def test__batched_inference__matches_single_dataset(device: str) -> None:
     """
     if device == "cuda" and not torch.cuda.is_available():
         pytest.skip("CUDA device requested but not available.")
+    if device == "xpu" and not (hasattr(torch, "xpu") and torch.xpu.is_available()):
+        pytest.skip("XPU device requested but not available.")
 
     def mkds(seed: int, n: int = 60, f: int = 5) -> tuple[np.ndarray, np.ndarray]:
         r = np.random.RandomState(seed)

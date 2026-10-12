@@ -135,7 +135,15 @@ def test__to__after_fit__no_tensors_left_on_old_device(
     estimator_class: type[TabPFNClassifier] | type[TabPFNRegressor],
     fit_mode: str,
 ) -> None:
-    alt_device = "cuda" if "cuda" in devices else "mps" if "mps" in devices else None
+    alt_device = (
+        "cuda"
+        if "cuda" in devices
+        else "xpu"
+        if "xpu" in devices
+        else "mps"
+        if "mps" in devices
+        else None
+    )
     if alt_device is None:
         pytest.skip("Test can only run when two devices are available.")
 
@@ -159,7 +167,15 @@ def test__to__after_fit_and_predict__no_tensors_left_on_old_device(
     fit_mode: str,
     model_version: ModelVersion,
 ) -> None:
-    alt_device = "cuda" if "cuda" in devices else "mps" if "mps" in devices else None
+    alt_device = (
+        "cuda"
+        if "cuda" in devices
+        else "xpu"
+        if "xpu" in devices
+        else "mps"
+        if "mps" in devices
+        else None
+    )
     if alt_device is None:
         pytest.skip("Test can only run when two devices are available.")
 
